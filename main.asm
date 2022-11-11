@@ -1,6 +1,6 @@
   .inesprg 1    ; Defines the number of 16kb PRG banks
   .ineschr 1    ; Defines the number of 8kb CHR banks
-  .inesmap 1    ; Defines the NES mapper
+  .inesmap 0   ; Defines the NES mapper
   .inesmir 1    ; Defines VRAM mirroring of banks
 
   .rsset $0000 ;Defining some variables at $0000
@@ -14,8 +14,8 @@ pointerBackgroundHighByte .rs 1
 
 RESET:
   ;JSR - jump to that label, then return here once it is done
-  JSR LoadPalettes
   JSR LoadBackground
+  JSR LoadPalettes
 
   ;% - binary
   LDA #%10000000 ; Enable NMI, sprites and background on table 0
@@ -23,6 +23,13 @@ RESET:
   LDA #%10001010 ; Disable sprites, enable backgrounds
   STA $2001
   LDA #$00 ; No background scrolling
+  STA $2006
+  STA $2006
+  STA $2005
+  STA $2005
+
+InfiniteLoop:
+  JMP InfiniteLoop
 
   LoadPalettes:
     LDA $2002 ; read PPU status to reset the high/low latch
@@ -37,6 +44,21 @@ RESET:
     INX                   ; Incrementing value at X register => going to next palette
     CPX #$10              ; Compare X to hex $10 => 16 dec - copying 16 bytes = 4 sprites
     BNE LoadPalettesLoop  ; restart cycle to LoadPalettesLoop if X is not 16
+
+  LoadAttributes:
+    LDA $2002
+    LDA #$23
+    STA $2006
+    LDA #$C0
+    STA $2006
+    LDX #$00
+  .AtrLoop:
+    LDA attributes, x
+    STA $2007
+    INX
+    CPX #$40
+    BNE .AtrLoop
+    RTS
 
   
 
@@ -88,6 +110,7 @@ LoadBackground:
   RTS ;Return from Subroutine means end of method
 
 
+
   
 
 ;IRQ: for mapper and audio
@@ -102,13 +125,13 @@ NMI:
   .bank 1 ;bank for RESET NMI and IRQ
   .org $E000
   background_palette:
-  .db $38,$22,$12,$17
-  .db $1F,$1F,$1F,$17
-  .db $1F,$1F,$1F,$17	
-  .db $1F,$1F,$1F,$17	
+  .db $38,$1F,$12,$16, $38,$1F,$13,$18, $38,$1F,$13,$17, $38,$17,$13,$18
 
 background:
   .include "graphics/bg.asm" ;include our background file
+
+attributes:
+  .include "graphics/attributes.asm"
 
   .org $FFFA ;at adress $FFFA
   ;dw means dataword (defining word weight 2 bytes data)
@@ -119,3 +142,4 @@ background:
   .bank 2 ;bank for sprite and background data
   .org $0000 ;at adress $0000
   .incbin "me.bin" ;including graphics file
+
