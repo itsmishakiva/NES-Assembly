@@ -1,26 +1,25 @@
   .inesprg 1    ; Defines the number of 16kb PRG banks
   .ineschr 1    ; Defines the number of 8kb CHR banks
-  .inesmap 0   ; Defines the NES mapper
+  .inesmap 0    ; Defines the NES mapper
   .inesmir 1    ; Defines VRAM mirroring of banks
 
   .rsset $0000 ;Defining some variables at $0000
-  ;.rs defines how many bytes needed for variable
+  
 pointerBackgroundLowByte  .rs 1
 pointerBackgroundHighByte .rs 1
 
-  .bank 0 ;bank can contain at most 8kb of memory
-  .org $C000 ;address space of this bank will originate
-             ; at address $C000 and fill 8kb of memory beyond that address
+  .bank 0 ;bank contains the game's "program"  (max 8kb)
+  .org $C000
 
 RESET:
-  ;JSR - jump to that label, then return here once it is done
   JSR LoadBackground
-  JSR LoadPalettes
+  JSR LoadPalettesSprite
+  JSR LoadPalettesBG
+  JSR LoadSprites
 
-  ;% - binary
-  LDA #%10000000 ; Enable NMI, sprites and background on table 0
+  LDA #%10001000 ; Enable NMI, sprites and background on table 0
   STA $2000
-  LDA #%10001010 ; Disable sprites, enable backgrounds
+  LDA #%00011110 ; Enable sprites, enable backgrounds
   STA $2001
   LDA #$00 ; No background scrolling
   STA $2006
@@ -31,7 +30,7 @@ RESET:
 InfiniteLoop:
   JMP InfiniteLoop
 
-  LoadPalettes:
+  LoadPalettesBG:
     LDA $2002 ; read PPU status to reset the high/low latch
     LDA #$3F
     STA $2006 ; write the high byte of $3F00 address
@@ -40,10 +39,24 @@ InfiniteLoop:
     LDX #$00
   LoadPalettesLoop:
     LDA background_palette, x
-    STA $2007             ; write to PPU
-    INX                   ; Incrementing value at X register => going to next palette
+    STA $2007             
+    INX        
     CPX #$10              ; Compare X to hex $10 => 16 dec - copying 16 bytes = 4 sprites
-    BNE LoadPalettesLoop  ; restart cycle to LoadPalettesLoop if X is not 16
+    BNE LoadPalettesLoop
+
+  LoadPalettesSprite:
+    LDA $2002 ; read PPU status to reset the high/low latch
+    LDA #$3F
+    STA $2006 ; write the high byte of $3F00 address
+    LDA #$10
+    STA $2006 ; write the low byte of $3F00 address
+    LDX #$00
+  LoadPalettesLoopSprite:
+    LDA sprite_palette, x
+    STA $2007             
+    INX                   
+    CPX #$10             
+    BNE LoadPalettesLoopSprite 
 
   LoadAttributes:
     LDA $2002
@@ -63,18 +76,12 @@ InfiniteLoop:
   
 
 LoadBackground:
-  ;LDA (Load Accumulator) - take a raw value or value from a memory
-  ;address and load it into the accumulator register
-  ;LDA $2002 ;loading the address $2002 specifically to reset the PPU (Picture Processing Unit)
-  ;The # sign means it is a value, and the $ sign means it is in hexadecimal
-  ;STA (Store Accumulator) - take Accumulator value and store it in memory
-  ;$2006 is a port to the PPU to tell it where to store the background data
-  LDA #$20 ;load #$20 into the accumulator
-  STA $2006; take that value and store it at $2006
+  LDA $2002
+  LDA #$20 
+  STA $2006
   LDA #$00
   STA $2006
-  ;memory adresses are two bytes and we can only send one byte at a time
-  ;so sending it two times and getting $2000 on the PPU
+  ;sending #2000 to $2006
 
   ;loading low byte of bg data and storing it in var lowByte
   LDA #LOW(background)
@@ -85,61 +92,68 @@ LoadBackground:
   ;This is used to loop through all the data (in .Loop starting from lowByte ending w highByte)
   ;#LOW and #HIGH are predefined functions for assembler
 
-  LDX #$00 ;load data in X register
-  LDY #$00 ;load data in Y register
-;. at the beggining of label means it is private (not accesible outside of parent label)
+  LDX #$00 
+  LDY #$00 
 .Loop:
-  LDA [pointerBackgroundLowByte], Y ;This LDA uses the Y register to offset the memory access.
-                                    ; Each time it will load the next byte in the sequence.
+  LDA [pointerBackgroundLowByte], Y
   STA $2007 ;Writing a byte to $2007 communicates one graphical tile to the PPU
   ;so we will need to repeatedly send data to this address until we’re done
-  INY ;Increment the value in the Y register
-  CPY #$00 ;Compare value in Y to the value #$00
-  BNE .Loop ;restart .Loop if Y is not equal to #$00 (Branch if not equal) 
+  INY
+  CPY #$00
+  BNE .Loop
 
-  ;This part is a secondary loop. We have too much data to send with a single register,
-  ;that contains 960 bytes. we can only store one byte in a register at a time
-  ;So we can only go up to 256 until we start to overflow
   ;Once we overflow and hit #$00 again, we are using the X register
   ;to allow this to happen 4 times before finishing cycle
-  ;This is enough to get the 960 bytes of data we need.
-  INC pointerBackgroundHighByte ;Increment variable so that when loop breaks we still had enough bytes in mem
-  INX ;Increment value in X
-  CPX #$04 ;Compare value in X to the value #$04
-  BNE .Loop ;restart .Loop if X is not yet equal to #$04
-  RTS ;Return from Subroutine means end of method
+  ;This is enough to get the 960 bytes of data we need for background.
+  INC pointerBackgroundHighByte
+  INX 
+  CPX #$04 
+  BNE .Loop
+  RTS
 
 
-
-  
-
-;IRQ: for mapper and audio
-;The CPU has a few memory addresses set aside
-;to define three interrupt vectors (NMI, RESET, and IRQ).
-;These three vectors will each take up 2 bytes of memory
-;and will be located at the range $FFFA-$FFFF
+LoadSprites:
+  LDX #$00
+.Loop:
+  LDA sprites, x
+  STA $1000, x ;1000 - adress containing first byte second pattern table
+  INX
+  CPX #$20 ; Loading 8 tiles (each containing 8 byte data => takes 4 mem adress)
+           ; 8 * 4 = 32 which is 20 in hex
+  BNE .Loop
+  RTS
 
 NMI:
+  LDA #$00
+  STA $2003
+  LDA #$10
+  STA $4014
   RTI ;RTI denotes end of NMI
 
-  .bank 1 ;bank for RESET NMI and IRQ
+  .bank 1 ;bank for RESET, NMI and IRQ
   .org $E000
   background_palette:
-  .db $38,$1F,$12,$16, $38,$1F,$13,$18, $38,$1F,$13,$17, $38,$17,$13,$18
+  .db $1d,$2d,$06,$26, $1d,$02,$04,$13, $1d,$2d,$06,$17
+
+  sprite_palette:
+  .db $1d,$08,$06,$26
 
 background:
-  .include "graphics/bg.asm" ;include our background file
+  .incbin "nametable.bin" ;background tiles
+
+sprites:
+  .include "sprite.asm" ;sprite nametable
 
 attributes:
-  .include "graphics/attributes.asm"
+  .incbin "attributes.bin" ;background attributes
 
-  .org $FFFA ;at adress $FFFA
-  ;dw means dataword (defining word weight 2 bytes data)
+  .org $FFFA ;$FFFA - addresses to define three interrupt vectors (NMI, RESET, and IRQ)
   .dw NMI 
   .dw RESET
-  .dw 0 ;IRQ 0 for now, not used
+  .dw 0 ;IRQ 0 for now
 
   .bank 2 ;bank for sprite and background data
-  .org $0000 ;at adress $0000
-  .incbin "me.bin" ;including graphics file
-
+  .org $0000
+  .incbin "pattern.bin" ;background pattern table
+  .org $1000 
+  .incbin "spritePattern.bin" ;sprite pattern table 
