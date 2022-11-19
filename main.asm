@@ -8,6 +8,24 @@
 pointerBackgroundLowByte  .rs 1
 pointerBackgroundHighByte .rs 1
 
+charcterTile1X = $1003
+charcterTile2X = $1007
+charcterTile3X = $100B
+charcterTile4X = $100F
+charcterTile5X = $1013
+charcterTile6X = $1017
+charcterTile7X = $101B
+charcterTile8X = $101F
+
+charcterTile1 = $1001
+charcterTile2 = $1005
+charcterTile3 = $1009
+charcterTile4 = $100D
+charcterTile5 = $1011
+charcterTile6 = $1015
+charcterTile7 = $1019
+charcterTile8 = $101D
+
   .bank 0 ;bank contains the game's "program"  (max 8kb)
   .org $C000
 
@@ -37,12 +55,12 @@ InfiniteLoop:
     LDA #$00
     STA $2006 ; write the low byte of $3F00 address
     LDX #$00
-  LoadPalettesLoop:
+  .Loop:
     LDA background_palette, x
     STA $2007             
     INX        
     CPX #$10              ; Compare X to hex $10 => 16 dec - copying 16 bytes = 4 sprites
-    BNE LoadPalettesLoop
+    BNE .Loop
 
   LoadPalettesSprite:
     LDA $2002 ; read PPU status to reset the high/low latch
@@ -51,12 +69,12 @@ InfiniteLoop:
     LDA #$10
     STA $2006 ; write the low byte of $3F00 address
     LDX #$00
-  LoadPalettesLoopSprite:
+  .Loop:
     LDA sprite_palette, x
     STA $2007             
     INX                   
     CPX #$10             
-    BNE LoadPalettesLoopSprite 
+    BNE .Loop 
 
   LoadAttributes:
     LDA $2002
@@ -65,12 +83,12 @@ InfiniteLoop:
     LDA #$C0
     STA $2006
     LDX #$00
-  .AtrLoop:
+  .Loop:
     LDA attributes, x
     STA $2007
     INX
     CPX #$40
-    BNE .AtrLoop
+    BNE .Loop
     RTS
 
   
@@ -123,11 +141,94 @@ LoadSprites:
   BNE .Loop
   RTS
 
+ReadPlayerOneControls:
+  LDA #$01
+  STA $4016
+  LDA #$00
+  STA $4016
+
+ReadA:
+  LDA $4016       ; Player 1 - A
+  AND #%00000001
+  BEQ EndReadA 
+
+
+EndReadA:
+  LDA $4016       ; Player 1 - B
+  LDA $4016       ; Player 1 - Select
+  LDA $4016       ; Player 1 - Start
+
+ReadUp:
+  LDA $4016       ; Player 1 - Up
+EndReadUp:
+
+ReadDown:
+  LDA $4016       ; Player 1 - Down
+  AND #%00000001
+  BEQ EndReadDown
+
+EndReadDown:
+
+ReadLeft:
+  LDA $4016       ; Player 1 - Left
+  AND #%00000001
+  BEQ EndReadLeft
+  LDX charcterTile1X
+  SEC
+  CPX #$00
+  BEQ EndReadLeft
+
+  LDA charcterTile1X
+  SEC
+  SBC #%00000001
+  STA charcterTile1X
+  STA charcterTile3X
+  STA charcterTile5X
+  STA charcterTile7X
+
+  LDA charcterTile2X
+  SEC
+  SBC #%00000001
+  STA charcterTile2X
+  STA charcterTile4X
+  STA charcterTile6X
+  STA charcterTile8X
+
+EndReadLeft:
+
+ReadRight:
+  LDA $4016       ; Player 1 - Right
+  AND #%00000001
+  BEQ EndReadRight
+  LDX charcterTile1X
+  SEC
+  CPX #$F0
+  BEQ EndReadRight
+
+  LDA charcterTile1X
+  CLC
+  ADC #%00000001
+  STA charcterTile1X
+  STA charcterTile3X
+  STA charcterTile5X
+  STA charcterTile7X
+
+  LDA charcterTile2X
+  CLC
+  ADC #%00000001
+  STA charcterTile2X
+  STA charcterTile4X
+  STA charcterTile6X
+  STA charcterTile8X
+EndReadRight:
+  RTS
+
 NMI:
   LDA #$00
   STA $2003
   LDA #$10
   STA $4014
+  JSR ReadPlayerOneControls
   RTI ;RTI denotes end of NMI
 
   .bank 1 ;bank for RESET, NMI and IRQ
