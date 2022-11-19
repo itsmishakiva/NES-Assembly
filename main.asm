@@ -26,6 +26,9 @@ charcterTile6 = $1015
 charcterTile7 = $1019
 charcterTile8 = $101D
 
+moveAnimProperty = $0030 ;adress for containing legs position
+shouldMoveLegs = $0031
+
   .bank 0 ;bank contains the game's "program"  (max 8kb)
   .org $C000
 
@@ -44,6 +47,9 @@ RESET:
   STA $2006
   STA $2005
   STA $2005
+  LDX #$00
+  STX moveAnimProperty
+  LDY #$00
 
 InfiniteLoop:
   JMP InfiniteLoop
@@ -199,17 +205,97 @@ EndReadLeft:
 ReadRight:
   LDA $4016       ; Player 1 - Right
   AND #%00000001
-  BEQ EndReadRight
+  BEQ RightNotPressed
   LDX charcterTile1X
   SEC
   CPX #$F0
-  BEQ EndReadRight
+  BEQ RightNotPressed
 
+  LDY shouldMoveLegs
+  INC shouldMoveLegs
+  CPY #$00
+  BNE MoveCharacter
+
+  JSR MoveCharacterTop
+
+  INC moveAnimProperty
+  LDY moveAnimProperty
+  CPY #$03
+  BEQ .backwardAnim
+  CPY #$04
+  BEQ .backwardAnim
+
+.forwardAnim:
+  LDA charcterTile5X
+  CLC
+  ADC #%00000100
+  STA charcterTile5X
+  STA charcterTile7X
+
+  LDA charcterTile6X
+  SEC
+  SBC #%00000010
+  STA charcterTile6X
+  STA charcterTile8X
+  JMP EndReadRight
+.backwardAnim: 
+  LDA charcterTile6X
+  CLC
+  ADC #%00000100
+  STA charcterTile6X
+  STA charcterTile8X
+
+  LDA charcterTile5X
+  SEC
+  SBC #%00000010
+  STA charcterTile5X
+  STA charcterTile7X
+
+  LDY moveAnimProperty
+  CPY #$04
+  BNE EndReadRight
+
+ .EndReadYAndZeroLegs:
+  LDY #$00
+  STY moveAnimProperty
+  RTS 
+
+RightNotPressed:
+  LDY #$00
+  STY moveAnimProperty
+
+  LDA charcterTile1X
+  STA charcterTile1X
+  STA charcterTile3X
+  STA charcterTile5X
+  STA charcterTile7X
+
+  LDA charcterTile2X
+  STA charcterTile2X
+  STA charcterTile4X
+  STA charcterTile6X
+  STA charcterTile8X
+
+  RTS
+
+EndReadRight:
+  RTS
+
+SetShouldMoveZero:
+  LDY #$00
+  STY shouldMoveLegs
+  JMP EndReadRight
+
+MoveCharacter:
   LDA charcterTile1X
   CLC
   ADC #%00000001
   STA charcterTile1X
   STA charcterTile3X
+
+  LDA charcterTile5X
+  CLC
+  ADC #%00000001
   STA charcterTile5X
   STA charcterTile7X
 
@@ -218,9 +304,28 @@ ReadRight:
   ADC #%00000001
   STA charcterTile2X
   STA charcterTile4X
+  LDA charcterTile6X
+  CLC
+  ADC #%00000001
   STA charcterTile6X
   STA charcterTile8X
-EndReadRight:
+  LDY shouldMoveLegs
+  CPY #$10
+  BEQ SetShouldMoveZero
+  JMP EndReadRight
+
+MoveCharacterTop:
+  LDA charcterTile1X
+  CLC
+  ADC #%00000001
+  STA charcterTile1X
+  STA charcterTile3X
+
+  LDA charcterTile2X
+  CLC
+  ADC #%00000001
+  STA charcterTile2X
+  STA charcterTile4X
   RTS
 
 NMI:
