@@ -17,17 +17,18 @@ charcterTile6X = $1017
 charcterTile7X = $101B
 charcterTile8X = $101F
 
-charcterTile1 = $1001
-charcterTile2 = $1005
-charcterTile3 = $1009
-charcterTile4 = $100D
-charcterTile5 = $1011
-charcterTile6 = $1015
-charcterTile7 = $1019
-charcterTile8 = $101D
+charcterTile1A = $1002
+charcterTile2A = $1006
+charcterTile3A = $100A
+charcterTile4A = $100E
+charcterTile5A = $1012
+charcterTile6A = $1016
+charcterTile7A = $101A
+charcterTile8A = $101E
 
-moveAnimProperty = $0030 ;adress for containing legs position
-shouldMoveLegs = $0031
+moveAnimProperty = $0100 ;adress for containing legs position
+shouldMoveLegs = $0101
+moveLeft = $0110
 
   .bank 0 ;bank contains the game's "program"  (max 8kb)
   .org $C000
@@ -37,6 +38,7 @@ RESET:
   JSR LoadPalettesSprite
   JSR LoadPalettesBG
   JSR LoadSprites
+  JSR SetShouldMoveZero
 
   LDA #%10001000 ; Enable NMI, sprites and background on table 0
   STA $2000
@@ -49,6 +51,7 @@ RESET:
   STA $2005
   LDX #$00
   STX moveAnimProperty
+  STX moveLeft
   LDY #$00
 
 InfiniteLoop:
@@ -147,46 +150,25 @@ LoadSprites:
   BNE .Loop
   RTS
 
-ReadPlayerOneControls:
-  LDA #$01
-  STA $4016
-  LDA #$00
-  STA $4016
-
-ReadA:
-  LDA $4016       ; Player 1 - A
-  AND #%00000001
-  BEQ EndReadA 
-
-
-EndReadA:
-  LDA $4016       ; Player 1 - B
-  LDA $4016       ; Player 1 - Select
-  LDA $4016       ; Player 1 - Start
-
-ReadUp:
-  LDA $4016       ; Player 1 - Up
-EndReadUp:
-
-ReadDown:
-  LDA $4016       ; Player 1 - Down
-  AND #%00000001
-  BEQ EndReadDown
-
-EndReadDown:
-
-ReadLeft:
-  LDA $4016       ; Player 1 - Left
-  AND #%00000001
-  BEQ EndReadLeft
-  LDX charcterTile1X
-  SEC
-  CPX #$00
-  BEQ EndReadLeft
+FlipCharcacter:
+  LDA charcterTile1A
+  AND #%01000000
+  CMP #%01000000
+  BEQ .Back
+  LDA charcterTile1A
+  ORA #%01000000
+  STA charcterTile1A
+  STA charcterTile2A
+  STA charcterTile3A
+  STA charcterTile4A
+  STA charcterTile5A
+  STA charcterTile6A
+  STA charcterTile7A
+  STA charcterTile8A
 
   LDA charcterTile1X
-  SEC
-  SBC #%00000001
+  CLC
+  ADC #%00001000
   STA charcterTile1X
   STA charcterTile3X
   STA charcterTile5X
@@ -194,22 +176,158 @@ ReadLeft:
 
   LDA charcterTile2X
   SEC
-  SBC #%00000001
+  SBC #%00001000
   STA charcterTile2X
   STA charcterTile4X
   STA charcterTile6X
   STA charcterTile8X
 
+  RTS
+.Back:
+  RTS
+
+FlipBackwards:
+  LDA charcterTile1A
+  AND #%01000000
+  CMP #%00000000
+  BEQ .Back
+  LDA charcterTile1A
+  AND #%10111111
+  STA charcterTile1A
+  STA charcterTile2A
+  STA charcterTile3A
+  STA charcterTile4A
+  STA charcterTile5A
+  STA charcterTile6A
+  STA charcterTile7A
+  STA charcterTile8A
+
+  LDA charcterTile1X
+  SEC
+  SBC #%00001000
+  STA charcterTile1X
+  STA charcterTile3X
+  STA charcterTile5X
+  STA charcterTile7X
+
+  LDA charcterTile2X
+  CLC
+  ADC #%00001000
+  STA charcterTile2X
+  STA charcterTile4X
+  STA charcterTile6X
+  STA charcterTile8X
+.Back:
+  RTS
+
+ReadPlayerOneControls:
+  LDA #$01
+  STA $4016
+  LDA #$00
+  STA $4016
+
+ReadA:
+  LDA $4016       ; Controller 1 input - A
+  AND #%00000001
+  BEQ EndReadA 
+
+
+EndReadA:
+  LDA $4016       ; Controller 1 input - B
+  LDA $4016       ; Controller 1 input - Select
+  LDA $4016       ; Controller 1 input - Start
+
+ReadUp:
+  LDA $4016       ; Controller 1 input - Up
+EndReadUp:
+
+ReadDown:
+  LDA $4016       ; Controller 1 input - Down
+  AND #%00000001
+  BEQ EndReadDown
+
+EndReadDown:
+
+ReadLeft:
+  LDA $4016       ; Controller 1 input - Left
+  AND #%00000001
+  BEQ EndReadLeft
+  JSR FlipCharcacter
+  LDY charcterTile1X
+  LDX moveLeft
+  CPX #$01
+  BNE .notPressd
+  CPY #$08
+  BEQ .notPressd
+
+  LDY shouldMoveLegs
+  INC shouldMoveLegs
+  CPY #$00
+  BNE .moveFull
+
+  JSR MoveCharacterTopBackwards
+
+  LDY moveAnimProperty
+  INC moveAnimProperty
+  CPY #$01
+  BEQ .backwardAnim
+
+.forwardAnim:
+  LDA charcterTile5X
+  SEC
+  SBC #%00000100
+  STA charcterTile3X
+  STA charcterTile5X
+  STA charcterTile7X
+
+  LDA charcterTile6X
+  CLC
+  ADC #%00000010
+  STA charcterTile4X
+  STA charcterTile6X
+  STA charcterTile8X
+  JMP EndReadRight
+.backwardAnim: 
+  LDA charcterTile6X
+  SEC
+  SBC #%00000100
+  STA charcterTile4X
+  STA charcterTile6X
+  STA charcterTile8X
+
+  LDA charcterTile5X
+  CLC
+  ADC #%00000010
+  STA charcterTile3X
+  STA charcterTile5X
+  STA charcterTile7X
+
+ .EndReadYAndZeroLegs:
+  LDY #$00
+  STY moveAnimProperty
+  JMP EndReadRight
+
+.moveFull:
+  JMP MoveCharacterBackward
+.notPressd:
+  LDX #$01
+  STX moveLeft 
+  JMP NotPressed
+
+
 EndReadLeft:
 
 ReadRight:
-  LDA $4016       ; Player 1 - Right
+  LDA $4016       ; Controller 1 input - Right
   AND #%00000001
-  BEQ RightNotPressed
-  LDX charcterTile1X
-  SEC
-  CPX #$F0
-  BEQ RightNotPressed
+  BEQ NotPressed
+  JSR FlipBackwards
+  LDY charcterTile1X
+  CPY #$F0
+  BEQ NotPressed
+  LDX moveLeft
+  CPX #$00
+  BNE .FirstStep
 
   LDY shouldMoveLegs
   INC shouldMoveLegs
@@ -218,23 +336,23 @@ ReadRight:
 
   JSR MoveCharacterTop
 
-  INC moveAnimProperty
   LDY moveAnimProperty
-  CPY #$03
-  BEQ .backwardAnim
-  CPY #$04
+  INC moveAnimProperty
+  CPY #$01
   BEQ .backwardAnim
 
 .forwardAnim:
   LDA charcterTile5X
   CLC
   ADC #%00000100
+  STA charcterTile3X
   STA charcterTile5X
   STA charcterTile7X
 
   LDA charcterTile6X
   SEC
   SBC #%00000010
+  STA charcterTile4X
   STA charcterTile6X
   STA charcterTile8X
   JMP EndReadRight
@@ -242,60 +360,54 @@ ReadRight:
   LDA charcterTile6X
   CLC
   ADC #%00000100
+  STA charcterTile4X
   STA charcterTile6X
   STA charcterTile8X
 
   LDA charcterTile5X
   SEC
   SBC #%00000010
+  STA charcterTile3X
   STA charcterTile5X
   STA charcterTile7X
-
-  LDY moveAnimProperty
-  CPY #$04
-  BNE EndReadRight
 
  .EndReadYAndZeroLegs:
   LDY #$00
   STY moveAnimProperty
   RTS 
+ .FirstStep:
+  LDX #$00
+  STX moveLeft
+  JMP NotPressed
 
-RightNotPressed:
+NotPressed:
   LDY #$00
   STY moveAnimProperty
+  STY shouldMoveLegs
 
   LDA charcterTile1X
-  STA charcterTile1X
   STA charcterTile3X
   STA charcterTile5X
   STA charcterTile7X
 
   LDA charcterTile2X
-  STA charcterTile2X
   STA charcterTile4X
   STA charcterTile6X
   STA charcterTile8X
 
   RTS
 
-EndReadRight:
-  RTS
-
-SetShouldMoveZero:
-  LDY #$00
-  STY shouldMoveLegs
-  JMP EndReadRight
-
 MoveCharacter:
   LDA charcterTile1X
   CLC
   ADC #%00000001
   STA charcterTile1X
-  STA charcterTile3X
+  ;STA charcterTile3X
 
   LDA charcterTile5X
   CLC
   ADC #%00000001
+  STA charcterTile3X
   STA charcterTile5X
   STA charcterTile7X
 
@@ -303,10 +415,11 @@ MoveCharacter:
   CLC
   ADC #%00000001
   STA charcterTile2X
-  STA charcterTile4X
+  ;STA charcterTile4X
   LDA charcterTile6X
   CLC
   ADC #%00000001
+  STA charcterTile4X
   STA charcterTile6X
   STA charcterTile8X
   LDY shouldMoveLegs
@@ -314,18 +427,71 @@ MoveCharacter:
   BEQ SetShouldMoveZero
   JMP EndReadRight
 
+EndReadRight:
+  RTS
+
+MoveCharacterBackward:
+  LDA charcterTile1X
+  SEC
+  SBC #%00000001
+  STA charcterTile1X
+  ;STA charcterTile3X
+
+  LDA charcterTile5X
+  SEC
+  SBC #%00000001
+  STA charcterTile3X
+  STA charcterTile5X
+  STA charcterTile7X
+
+  LDA charcterTile2X
+  SEC
+  SBC #%00000001
+  STA charcterTile2X
+  ;STA charcterTile4X
+  LDA charcterTile6X
+  SEC
+  SBC #%00000001
+  STA charcterTile4X
+  STA charcterTile6X
+  STA charcterTile8X
+  LDY shouldMoveLegs
+  CPY #$10
+  BEQ SetShouldMoveZero
+  JMP EndReadRight
+
+
+SetShouldMoveZero:
+  LDY #$00
+  STY shouldMoveLegs
+  JMP EndReadRight
+
 MoveCharacterTop:
   LDA charcterTile1X
   CLC
   ADC #%00000001
   STA charcterTile1X
-  STA charcterTile3X
+  ;STA charcterTile3X
 
   LDA charcterTile2X
   CLC
   ADC #%00000001
   STA charcterTile2X
-  STA charcterTile4X
+  ;STA charcterTile4X
+  RTS
+
+MoveCharacterTopBackwards:
+  LDA charcterTile1X
+  SEC
+  SBC #%00000001
+  STA charcterTile1X
+  ;STA charcterTile3X
+
+  LDA charcterTile2X
+  SEC
+  SBC #%00000001
+  STA charcterTile2X
+  ;STA charcterTile4X
   RTS
 
 NMI:
