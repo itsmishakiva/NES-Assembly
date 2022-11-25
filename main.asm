@@ -17,6 +17,15 @@ charcterTile6X = $1017
 charcterTile7X = $101B
 charcterTile8X = $101F
 
+characterTile1Y = $1000
+characterTile2Y = $1004
+characterTile3Y = $1008
+characterTile4Y = $100C
+characterTile5Y = $1010
+characterTile6Y = $1014
+characterTile7Y = $1018
+characterTile8Y = $101C
+
 charcterTile1A = $1002
 charcterTile2A = $1006
 charcterTile3A = $100A
@@ -27,8 +36,11 @@ charcterTile7A = $101A
 charcterTile8A = $101E
 
 moveAnimProperty = $0100 ;adress for containing legs position
-shouldMoveLegs = $0101
-moveLeft = $0110
+shouldMoveLegs = $0102
+moveLeft = $0104
+jumping = $0108
+falling = $010C
+shouldJump = $010E
 
   .bank 0 ;bank contains the game's "program"  (max 8kb)
   .org $C000
@@ -52,20 +64,13 @@ RESET:
   LDX #$00
   STX moveAnimProperty
   STX moveLeft
+  LDX #$00
+  STX jumping
+  STX falling
+  LDX #$03
+  STX shouldJump
   LDY #$00
   LDX #$00
-
-SpriteLoop:
-  LDA #$02
-  STA $10FD, x	;store it to sprite 1's y address
-  CPX #$FF
-  BEQ .break
-  INX
-  INX
-  INX
-  INX	
-  JMP SpriteLoop
-.break:
   
 
 InfiniteLoop:
@@ -164,6 +169,111 @@ LoadSprites:
   BNE .Loop
   RTS
 
+
+JumpUp:
+  LDX jumping
+  INX
+  STX jumping
+  LDX characterTile1Y
+  DEX
+  STX characterTile1Y
+  STX characterTile2Y
+  LDX characterTile3Y
+  DEX
+  STX characterTile3Y
+  STX characterTile4Y
+  LDX characterTile5Y
+  DEX
+  STX characterTile5Y
+  STX characterTile6Y
+  LDX characterTile7Y
+  DEX
+  STX characterTile7Y
+  STX characterTile8Y
+  LDX jumping
+  CPX #$14
+  BEQ .startFall
+  RTS
+.startFall:
+  LDX #$01
+  STX falling
+  RTS
+
+JumpUpDouble:
+  LDX jumping
+  INX
+  STX jumping
+  LDX characterTile1Y
+  DEX
+  DEX
+  STX characterTile1Y
+  STX characterTile2Y
+  LDX characterTile3Y
+  DEX
+  DEX
+  STX characterTile3Y
+  STX characterTile4Y
+  LDX characterTile5Y
+  DEX
+  DEX
+  STX characterTile5Y
+  STX characterTile6Y
+  LDX characterTile7Y
+  DEX
+  DEX
+  STX characterTile7Y
+  STX characterTile8Y
+  RTS
+
+JumpDown:
+  LDX falling
+  INX
+  STX falling
+  LDX characterTile1Y
+  INX
+  STX characterTile1Y
+  STX characterTile2Y
+  LDX characterTile3Y
+  INX
+  STX characterTile3Y
+  STX characterTile4Y
+  LDX characterTile5Y
+  INX
+  STX characterTile5Y
+  STX characterTile6Y
+  LDX characterTile7Y
+  INX
+  STX characterTile7Y
+  STX characterTile8Y
+  RTS
+
+JumpDownDouble:
+  LDX falling
+  INX
+  STX falling
+  LDX characterTile1Y
+  INX
+  INX
+  STX characterTile1Y
+  STX characterTile2Y
+  LDX characterTile3Y
+  INX
+  INX
+  STX characterTile3Y
+  STX characterTile4Y
+  LDX characterTile5Y
+  INX
+  INX
+  STX characterTile5Y
+  STX characterTile6Y
+  LDX characterTile7Y
+  INX
+  INX
+  STX characterTile7Y
+  STX characterTile8Y
+  RTS
+
+
 FlipCharcacter:
   LDA charcterTile1A
   AND #%01000000
@@ -241,13 +351,77 @@ ReadPlayerOneControls:
   STA $4016
 
 ReadA:
-  LDA $4016       ; Controller 1 input - A
+  LDA $4016   
+  LDX jumping
+  CPX #$00
+  BNE .content
+  LDX falling
+  CPX #$00
+  BNE .fallContent
   AND #%00000001
-  BEQ EndReadA 
-
+  BEQ EndReadA
+  JMP .content
+.jumpUP:
+  CLC
+  ADC #$14
+  JSR JumpUp
+  JMP EndReadA
+.jumpDown:
+  CLC
+  ADC #$0F
+  JSR JumpDown
+  JMP EndReadA
+.jumpUpD:
+  CLC
+  ADC #$06
+  JSR JumpUpDouble
+  JMP EndReadA
+.jumpDownD:
+  CLC
+  ADC #$15
+  JSR JumpDownDouble
+  JMP EndReadA
+.content:   
+  LDA jumping
+  SEC
+  SBC #$06
+  BMI .jumpUpD
+  CLC
+  ADC #$06
+  LDA jumping
+  SEC
+  SBC #$14
+  BMI .jumpUP
+  CLC
+  ADC #$14
+  LDX #$00
+  STX jumping
+  JMP EndReadA
+.fallContent:
+  LDA falling
+  SEC
+  SBC #$0F
+  BMI .jumpDown
+  CLC
+  ADC #$0F
+  LDA falling
+  SEC
+  SBC #$15
+  BMI .jumpDownD
+  CLC
+  ADC #$15
+  LDX #$00
+  STX falling
+  JMP EndReadA
 
 EndReadA:
+
+ReadB:
   LDA $4016       ; Controller 1 input - B
+  AND #%00000001
+  BEQ EndReadB
+
+EndReadB:
   LDA $4016       ; Controller 1 input - Select
   LDA $4016       ; Controller 1 input - Start
 
