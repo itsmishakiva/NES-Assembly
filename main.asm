@@ -53,6 +53,20 @@ RESET:
   STX moveAnimProperty
   STX moveLeft
   LDY #$00
+  LDX #$00
+
+SpriteLoop:
+  LDA #$02
+  STA $10FD, x	;store it to sprite 1's y address
+  CPX #$FF
+  BEQ .break
+  INX
+  INX
+  INX
+  INX	
+  JMP SpriteLoop
+.break:
+  
 
 InfiniteLoop:
   JMP InfiniteLoop
@@ -145,7 +159,7 @@ LoadSprites:
   LDA sprites, x
   STA $1000, x ;1000 - adress containing first byte second pattern table
   INX
-  CPX #$20 ; Loading 8 tiles (each containing 8 byte data => takes 4 mem adress)
+  CPX #$F0 ; Loading 8 tiles (each containing 8 byte data => takes 4 mem adress)
            ; 8 * 4 = 32 which is 20 in hex
   BNE .Loop
   RTS
@@ -505,10 +519,10 @@ NMI:
   .bank 1 ;bank for RESET, NMI and IRQ
   .org $E000
   background_palette:
-  .db $1d,$2d,$06,$26, $1d,$02,$04,$13, $1d,$2d,$06,$17
+  .db $01,$1D,$28,$30, $01,$1D,$1c,$28, $01,$00,$06,$28
 
   sprite_palette:
-  .db $1d,$08,$06,$26
+  .db $01,$1D,$06,$27, $01,$1D,$03,$06
 
 background:
   .incbin "nametable.bin" ;background tiles
@@ -529,3 +543,5 @@ attributes:
   .incbin "pattern.bin" ;background pattern table
   .org $1000 
   .incbin "spritePattern.bin" ;sprite pattern table 
+  .org $12C0 
+  .incbin "enemyPattern.bin"
